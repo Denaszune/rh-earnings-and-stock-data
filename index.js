@@ -11,11 +11,11 @@ function updateSymbolData(transaction) {
     
     const symbol = symbolDictionary[transaction.symbol];
     
-    const transaction_price = parseFloat(transaction.price);
     const transaction_quantity = parseFloat(transaction.quantity);
+    const transaction_price = parseFloat(transaction.price);
     
-    const new_total_price = symbol.total_price + (transaction_price*transaction_quantity);
     const new_quantity = symbol.quantity + transaction_quantity;
+    const new_total_price = symbol.total_price + (transaction_price*transaction_quantity);
     
     symbol.total_price = new_total_price;
     symbol.quantity = new_quantity;
@@ -23,14 +23,15 @@ function updateSymbolData(transaction) {
   }
   // sell
   else {
+    //http://www.onlineconversion.com/adjusted_cost_base.htm
     
     const symbol = symbolDictionary[transaction.symbol];
     
-    const transaction_price = parseFloat(transaction.price);
     const transaction_quantity = parseFloat(transaction.quantity);
-    
-    const new_total_price = symbol.total_price - (transaction_price*transaction_quantity);
+    const transaction_price = parseFloat(transaction.price);
+
     const new_quantity = symbol.quantity - transaction_quantity;
+    const new_total_price = symbol.total_price * (new_quantity/symbol.quantity);
     
     symbol.total_price = new_total_price;
     symbol.quantity = new_quantity;
