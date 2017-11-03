@@ -1,7 +1,7 @@
 {
   "name": "rh-earnings-and-stock-data",
   "version": "1.0.0",
-  "description": "Utility to determine yearly earnings and track stock averages. Trade transaction data obtained from Robinhood API.",
+  "description": "A node script to calculate yearly earnings and track stock averages. Trade transaction data obtained from Robinhood API.",
   "main": "index.js",
   "dependencies": {
     "csv-parse": "^2.0.0",
