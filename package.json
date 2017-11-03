@@ -1,0 +1,24 @@
+{
+  "name": "rh-earnings-and-stock-data",
+  "version": "1.0.0",
+  "description": "Utility to determine yearly earnings and track stock averages. Trade transaction data obtained from Robinhood API.",
+  "main": "index.js",
+  "dependencies": {
+    "csv-parse": "^2.0.0",
+    "inquirer": "^3.3.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Denaszune/rh-earnings-and-stock-data.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Denaszune/rh-earnings-and-stock-data/issues"
+  },
+  "homepage": "https://github.com/Denaszune/rh-earnings-and-stock-data#readme"
+}
