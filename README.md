@@ -2,12 +2,8 @@
 
 A node script to calculate yearly earnings and track stock averages. Trade transaction data obtained from Robinhood API.
 
-This script relies on [robinhood-to-csv](https://github.com/joshfraser/robinhood-to-csv) to produce a csv file acceptable for parsing.
-
 #### Prerequisites:
-node.js v6.11.2 or higher
-
-csv file generated from [robinhood-to-csv](https://github.com/joshfraser/robinhood-to-csv) 
+node.js v8.9.0 or higher
 
 #### Install:
 Download repository and then navigate to the root of repository folder.
