@@ -20,7 +20,7 @@ function logSymbolDictionary() {
 function updateSymbolData(transaction) {
   if (transaction.side === 'buy') {
     
-    const symbol = symbolDictionary[transaction.symbol];
+    const symbol = symbolDictionary[transaction.instrument];
     
     const transaction_quantity = parseFloat(transaction.quantity);
     const transaction_price = parseFloat(transaction.price);
@@ -36,7 +36,7 @@ function updateSymbolData(transaction) {
   else {
     //http://www.onlineconversion.com/adjusted_cost_base.htm
     
-    const symbol = symbolDictionary[transaction.symbol];
+    const symbol = symbolDictionary[transaction.instrument];
     
     const transaction_quantity = parseFloat(transaction.quantity);
     const transaction_price = parseFloat(transaction.price);
@@ -52,7 +52,7 @@ function updateSymbolData(transaction) {
 
 function addNewSymbol(transaction) {
   if (transaction.side === 'buy') {
-    symbolDictionary[transaction.symbol] = {
+    symbolDictionary[transaction.instrument] = {
       'average_price': parseFloat(transaction.price),
       'total_price': parseFloat(transaction.price),
       'quantity': parseFloat(transaction.quantity)
@@ -60,13 +60,13 @@ function addNewSymbol(transaction) {
   }
   // why is the first transaction for this symbol a sell? Free stock...
   else {
-    console.log('Why is the first transaction for '+transaction.symbol +' a sell? Aborting transaction...');
+    console.log('Why is the first transaction for '+transaction.instrument +' a sell? Aborting transaction...');
   }
 }
 
 function addOrUpdateFilledTransaction(transaction) {
   // symbol has previous transactions
-  if (symbolDictionary.hasOwnProperty(transaction.symbol)) {
+  if (symbolDictionary.hasOwnProperty(transaction.instrument)) {
     updateSymbolData(transaction);
   }
   // new transaction for this symbol
@@ -85,10 +85,10 @@ function interateFilledTransactions(transactions) {
   }
 }
 
-async function getTrades(token) {
+async function getTrades(token, uri) {
   const options = {
     method: 'GET',
-    uri: 'https://api.robinhood.com/orders/',
+    uri: uri,
     headers: {
       'Authorization': 'Token ' + token
     },
@@ -104,8 +104,16 @@ async function getTrades(token) {
 }
 
 async function process(token) {
-  const trades = await getTrades(token);
-  console.log(util.inspect(trades));
+  let orders = [];
+  let trades = await getTrades(token, 'https://api.robinhood.com/orders/');
+  orders = orders.concat(trades.results);
+
+  while(trades.next) {
+    trades = await getTrades(token, trades.next);
+    orders = orders.concat(trades.results);
+  }
+  interateFilledTransactions(orders);
+  logSymbolDictionary();
 }
 
 async function login(credentials) {
@@ -143,7 +151,7 @@ inquirer.prompt(credentialsQuestions).then(async credentials => {
     const mfaQuestion = {
       type:'input', 
       name:'mfa_code', 
-      message:'Enter MFA code:'
+      message:'Enter Robinhood MFA code:'
     };
     
     inquirer.prompt([mfaQuestion]).then(async mfa => {
