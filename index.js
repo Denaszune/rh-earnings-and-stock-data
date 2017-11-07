@@ -19,7 +19,7 @@ function logSymbolDictionary() {
 function updateSymbolData(transaction) {
   if (transaction.side === 'buy') {
     
-    const symbol = symbolDictionary[transaction.instrument];
+    const symbol = symbolDictionary[transaction.symbol];
     
     const transaction_quantity = parseFloat(transaction.quantity);
     const transaction_price = parseFloat(transaction.price);
@@ -35,7 +35,7 @@ function updateSymbolData(transaction) {
   else {
     //http://www.onlineconversion.com/adjusted_cost_base.htm
     
-    const symbol = symbolDictionary[transaction.instrument];
+    const symbol = symbolDictionary[transaction.symbol];
     
     const transaction_quantity = parseFloat(transaction.quantity);
     const transaction_price = parseFloat(transaction.price);
@@ -49,9 +49,29 @@ function updateSymbolData(transaction) {
   }
 }
 
-function addNewSymbol(transaction) {
+async function getInstrument(uri) {
+  const options = {
+    method: 'GET',
+    uri: uri,
+    json: true
+  };
+  try {
+    const response = await request(options);
+    return Promise.resolve(response);
+  }
+  catch (error) {
+    return Promise.reject(error);
+  }
+}
+
+async function addNewSymbol(transaction) {
   if (transaction.side === 'buy') {
-    symbolDictionary[transaction.instrument] = {
+    
+    const instrument = await getInstrument(transaction.instrument);
+    
+    transaction['symbol'] = instrument.symbol;
+    
+    symbolDictionary[transaction.symbol] = {
       'average_price': parseFloat(transaction.price),
       'total_price': parseFloat(transaction.price),
       'quantity': parseFloat(transaction.quantity)
@@ -59,13 +79,13 @@ function addNewSymbol(transaction) {
   }
   // why is the first transaction for this symbol a sell? Free stock...
   else {
-    console.log('Why is the first transaction for '+transaction.instrument +' a sell? Aborting transaction...');
+    console.log('Why is the first transaction for '+transaction.symbol +' a sell? Aborting transaction...');
   }
 }
 
 function addOrUpdateFilledTransaction(transaction) {
   // symbol has previous transactions
-  if (symbolDictionary.hasOwnProperty(transaction.instrument)) {
+  if (symbolDictionary.hasOwnProperty(transaction.symbol)) {
     updateSymbolData(transaction);
   }
   // new transaction for this symbol
@@ -77,7 +97,6 @@ function addOrUpdateFilledTransaction(transaction) {
 function interateFilledTransactions(transactions) {
   for (let i = transactions.length-1; i > -1; i--) {
     const transaction = transactions[i];
-    
     if (transaction.state === 'filled') {
       addOrUpdateFilledTransaction(transaction);
     }
