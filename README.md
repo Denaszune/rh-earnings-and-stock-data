@@ -2,6 +2,8 @@
 
 A node script to calculate yearly earnings and track stock averages. Trade transaction data obtained from Robinhood API.
 
+This script is made possible by Sanko's [Unofficial Documentation](https://github.com/sanko/Robinhood) for the Robinhood API.
+
 #### Prerequisites:
 node.js v8.9.0 or higher
 

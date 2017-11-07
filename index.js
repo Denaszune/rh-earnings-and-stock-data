@@ -2,7 +2,6 @@
 
 const request = require('request-promise-native');
 const inquirer = require('inquirer');
-const util = require('util');
 
 let symbolDictionary = {};
 
