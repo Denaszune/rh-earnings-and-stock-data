@@ -3,6 +3,8 @@
 const request = require('request-promise-native');
 const inquirer = require('inquirer');
 
+let linkToSymbolDictionary = {};
+let stockSplitsDictionary = {};
 let symbolDictionary = {};
 
 function logSymbolDictionary() {
@@ -10,9 +12,9 @@ function logSymbolDictionary() {
     const currentSymbol = symbolDictionary[prop];
     console.log('---------');
     console.log(prop);
+    console.log('Shares: '+currentSymbol.quantity);
     console.log('Total Cost: '+currentSymbol.total_price);
-    console.log('Average Cost: '+currentSymbol.average_price);
-    console.log('Quantity: '+currentSymbol.quantity);
+    console.log('Average Cost (Adjusted Base Cost): '+currentSymbol.average_price);
   }
 }
 
@@ -30,6 +32,7 @@ function updateSymbolData(transaction) {
     symbol.total_price = new_total_price;
     symbol.quantity = new_quantity;
     symbol.average_price = new_total_price / new_quantity;
+    symbol.last_created_at = transaction.created_at;
   }
   // sell
   else {
@@ -46,10 +49,52 @@ function updateSymbolData(transaction) {
     symbol.total_price = new_total_price;
     symbol.quantity = new_quantity;
     symbol.average_price = new_total_price / new_quantity;
+    symbol.last_created_at = transaction.created_at;
   }
 }
 
-async function getInstrument(uri) {
+function updateSymbolDataWithSplits(transaction) {
+  const splits = stockSplitsDictionary[transaction.symbol]
+  // if this symbol has splits
+  if (splits.length > 0) {
+    const mostRecentSplit = splits[splits.length-1];
+    // if the most recent split in the array of splits is between my last trade and my new trade
+    if (mostRecentSplit.execution_date > symbolDictionary[transaction.symbol].last_created_at
+      && mostRecentSplit.execution_date < transaction.created_at) {
+        //do math to symbol dictionary to adjust symbol data
+        //i believe i need the price of the stock at execution_date
+      }
+  }
+}
+
+function addNewSymbol(transaction) {
+  if (transaction.side === 'buy') {
+    symbolDictionary[transaction.symbol] = {
+      'average_price': parseFloat(transaction.price),
+      'total_price': parseFloat(transaction.price),
+      'quantity': parseFloat(transaction.quantity),
+      'last_created_at': transaction.created_at
+    };
+  }
+  // why is the first transaction for this symbol a sell? Free stock...
+  else {
+    console.log('Why is the first transaction for '+transaction.symbol +' a sell? Aborting transaction...');
+  }
+}
+
+function addOrUpdateFilledTransaction(transaction) {
+  // symbol has previous transactions
+  if (symbolDictionary.hasOwnProperty(transaction.symbol)) {
+    updateSymbolDataWithSplits(transaction);
+    updateSymbolData(transaction);
+  }
+  // new transaction for this symbol
+  else {
+    addNewSymbol(transaction);
+  }
+}
+
+async function getInstrumentOrSplits(uri) {
   const options = {
     method: 'GET',
     uri: uri,
@@ -64,40 +109,24 @@ async function getInstrument(uri) {
   }
 }
 
-async function addNewSymbol(transaction) {
-  if (transaction.side === 'buy') {
-    
-    const instrument = await getInstrument(transaction.instrument);
-    
-    transaction['symbol'] = instrument.symbol;
-    
-    symbolDictionary[transaction.symbol] = {
-      'average_price': parseFloat(transaction.price),
-      'total_price': parseFloat(transaction.price),
-      'quantity': parseFloat(transaction.quantity)
-    };
+async function getSymbol(transaction) {
+  if (linkToSymbolDictionary.hasOwnProperty(transaction.instrument)) {
+    return linkToSymbolDictionary[transaction.instrument];
   }
-  // why is the first transaction for this symbol a sell? Free stock...
   else {
-    console.log('Why is the first transaction for '+transaction.symbol +' a sell? Aborting transaction...');
+    const instrument = await getInstrumentOrSplits(transaction.instrument);
+    const splits = await getInstrumentOrSplits(instrument.splits);
+    linkToSymbolDictionary[transaction.instrument] = instrument.symbol;
+    stockSplitsDictionary[instrument.symbol] = splits.results;
+    return instrument.symbol;
   }
 }
 
-function addOrUpdateFilledTransaction(transaction) {
-  // symbol has previous transactions
-  if (symbolDictionary.hasOwnProperty(transaction.symbol)) {
-    updateSymbolData(transaction);
-  }
-  // new transaction for this symbol
-  else {
-    addNewSymbol(transaction);
-  }
-}
-
-function interateFilledTransactions(transactions) {
+async function interateFilledTransactions(transactions) {
   for (let i = transactions.length-1; i > -1; i--) {
     const transaction = transactions[i];
     if (transaction.state === 'filled') {
+      transaction['symbol'] = await getSymbol(transaction);
       addOrUpdateFilledTransaction(transaction);
     }
   }
@@ -130,7 +159,7 @@ async function process(token) {
     trades = await getTrades(token, trades.next);
     orders = orders.concat(trades.results);
   }
-  interateFilledTransactions(orders);
+  await interateFilledTransactions(orders);
   logSymbolDictionary();
 }
 
