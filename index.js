@@ -2,6 +2,7 @@
 
 const request = require('request-promise-native');
 const inquirer = require('inquirer');
+const moment = require('moment');
 
 let linkToSymbolDictionary = {};
 let stockSplitsDictionary = {};
@@ -53,18 +54,37 @@ function updateSymbolData(transaction) {
   }
 }
 
+function updateSymbolDataWithSplitsLastRun() {
+  for (let prop in stockSplitsDictionary) {
+    const split = stockSplitsDictionary[prop];
+    if (split.length > 0) {
+      
+    }
+  }
+}
+
 function updateSymbolDataWithSplits(transaction) {
-  const splits = stockSplitsDictionary[transaction.symbol]
+  const splits = stockSplitsDictionary[transaction.symbol];
   // if this symbol has splits
   if (splits.length > 0) {
     const mostRecentSplit = splits[splits.length-1];
+    const symbol = symbolDictionary[transaction.symbol];
+    // console.log('old: '+symbol.last_created_at);
+    // console.log('split: '+mostRecentSplit.execution_date);
+    // console.log('new: '+transaction.created_at);
     // if the most recent split in the array of splits is between my last trade and my new trade
-    if (mostRecentSplit.execution_date > symbolDictionary[transaction.symbol].last_created_at
-      && mostRecentSplit.execution_date < transaction.created_at) {
+    if (moment(mostRecentSplit.execution_date).isAfter(symbol.last_created_at)
+      && moment(mostRecentSplit.execution_date).isBefore(transaction.created_at)) {
         //do math to symbol dictionary to adjust symbol data
-        //i believe i need the price of the stock at execution_date
-      }
-  }
+        // console.log(transaction.symbol);
+        symbol.quantity = symbol.quantity * (parseFloat(mostRecentSplit.multiplier)/parseFloat(mostRecentSplit.divisor));
+        symbol.average_price = symbol.total_price / symbol.quantity;
+        symbol.last_created_at = mostRecentSplit.execution_date;
+        splits.pop();
+        //run again it is possible there are multiple splits between transactions
+        updateSymbolDataWithSplits(transaction);
+      } else return;
+  } else return;
 }
 
 function addNewSymbol(transaction) {
@@ -151,6 +171,7 @@ async function getTrades(token, uri) {
 }
 
 async function process(token) {
+  console.log('Querying database...');
   let orders = [];
   let trades = await getTrades(token, 'https://api.robinhood.com/orders/');
   orders = orders.concat(trades.results);
@@ -160,6 +181,7 @@ async function process(token) {
     orders = orders.concat(trades.results);
   }
   await interateFilledTransactions(orders);
+  updateSymbolDataWithSplitsLastRun();
   logSymbolDictionary();
 }
 
