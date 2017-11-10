@@ -3,19 +3,46 @@
 const request = require('request-promise-native');
 const inquirer = require('inquirer');
 const moment = require('moment');
+const chalk = require('chalk');
 
 let linkToSymbolDictionary = {};
 let stockSplitsDictionary = {};
 let symbolDictionary = {};
+const symbolArray = [];
+
+function logSymbolSummary(symbol, symbolObject) {
+  console.log(chalk.magenta(symbol));
+  console.log(chalk.gray('Shares: '+symbolObject.quantity));
+  console.log(chalk.gray('Total Cost: '+symbolObject.total_price));
+  console.log(chalk.gray('Average Cost (Adjusted Base Cost): '+symbolObject.average_price));
+  console.log('');
+}
+
+function logStockTransactions(ticker) {
+  const symbol = symbolDictionary[ticker];
+  console.log('');
+  console.log(chalk.underline.bold('Transactions')+'\r');
+  console.log('');
+
+  for (let i = 0; i < symbol.transactions.length; i++) {
+    const currentTransaction = symbol.transactions[i];
+    console.log(chalk.magenta(currentTransaction.side.toUpperCase()));
+    console.log(chalk.gray('Date: '+moment(currentTransaction.created_at).format('MMMM Do YYYY, h:mm:ss a')));
+    console.log(chalk.gray('Shares: '+currentTransaction.quantity));
+    console.log(chalk.gray('Price: '+currentTransaction.price));
+    console.log('');
+  }
+
+  console.log(chalk.underline.bold('Summary'));
+  console.log('');
+  logSymbolSummary(ticker, symbol);
+}
 
 function logSymbolDictionary() {
   for (let prop in symbolDictionary) {
     const currentSymbol = symbolDictionary[prop];
-    console.log('---------');
-    console.log(prop);
-    console.log('Shares: '+currentSymbol.quantity);
-    console.log('Total Cost: '+currentSymbol.total_price);
-    console.log('Average Cost (Adjusted Base Cost): '+currentSymbol.average_price);
+    console.log('');
+    logSymbolSummary(prop, currentSymbol);
   }
 }
 
@@ -34,6 +61,7 @@ function updateSymbolData(transaction) {
     symbol.quantity = new_quantity;
     symbol.average_price = new_total_price / new_quantity;
     symbol.last_created_at = transaction.created_at;
+    symbol.transactions.push(transaction);
   }
   // sell
   else {
@@ -51,6 +79,7 @@ function updateSymbolData(transaction) {
     symbol.quantity = new_quantity;
     symbol.average_price = new_total_price / new_quantity;
     symbol.last_created_at = transaction.created_at;
+    symbol.transactions.push(transaction);
   }
 }
 
@@ -101,8 +130,10 @@ function addNewSymbol(transaction) {
       'average_price': parseFloat(transaction.price),
       'total_price': parseFloat(transaction.price),
       'quantity': parseFloat(transaction.quantity),
-      'last_created_at': transaction.created_at
+      'last_created_at': transaction.created_at,
+      'transactions': [transaction]
     };
+    symbolArray.push(transaction.symbol);
   }
   // why is the first transaction for this symbol a sell? Free stock...
   else {
@@ -179,7 +210,7 @@ async function getTrades(token, uri) {
 }
 
 async function process(token) {
-  console.log('Querying database...');
+  console.log(chalk.gray('Querying database and doing math...'));
   let orders = [];
   let trades = await getTrades(token, 'https://api.robinhood.com/orders/');
   orders = orders.concat(trades.results);
@@ -190,7 +221,51 @@ async function process(token) {
   }
   await interateFilledTransactions(orders);
   updateSymbolDataWithSplitsLastRun();
-  logSymbolDictionary();
+}
+
+const mainMenuQuestion = [{
+  type: 'list',
+  name: 'mainMenu',
+  message: 'Main Menu',
+  choices: [
+    {
+      name: 'Individual Stock Summary',
+      value: 'transactions'
+    },
+    {
+      name: 'Portfolio Summary',
+      value: 'stocks'
+    },
+    {
+      name: 'Yearly Earnings',
+      value: 'earnings'
+    }
+  ]
+}];
+
+function showMainMenu() {
+  inquirer.prompt(mainMenuQuestion).then(answer => {
+    if (answer.mainMenu === 'transactions') {
+      const tickerQuestion = [{
+        type: 'list',
+        name: 'ticker',
+        message: 'Choose a symbol:',
+        choices: symbolArray
+      }];
+
+      inquirer.prompt(tickerQuestion).then(answer => {
+        logStockTransactions(answer.ticker);
+        showMainMenu();
+      });
+    } 
+    else if (answer.mainMenu === 'stocks') {
+      logSymbolDictionary();
+      showMainMenu();
+    }
+    else if (answer.mainMenu === 'earnings') {
+      showMainMenu();
+    }
+  });
 }
 
 async function login(credentials) {
@@ -234,7 +309,8 @@ inquirer.prompt(credentialsQuestions).then(async credentials => {
     inquirer.prompt([mfaQuestion]).then(async mfa => {
       credentials["mfa_code"] = mfa.mfa_code;
       const mfaResponse = await login(credentials);
-      process(mfaResponse.token);
+      await process(mfaResponse.token);
+      showMainMenu();
     });
   } 
   // No Multi-factor authentication

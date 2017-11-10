@@ -4,6 +4,7 @@
   "description": "A node script to calculate yearly earnings and track stock averages. Trade transaction data obtained from Robinhood API.",
   "main": "index.js",
   "dependencies": {
+    "chalk": "^2.3.0",
     "inquirer": "^3.3.0",
     "moment": "^2.19.1",
     "request": "^2.83.0",
