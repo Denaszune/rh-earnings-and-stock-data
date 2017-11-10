@@ -56,10 +56,21 @@ function updateSymbolData(transaction) {
 
 function updateSymbolDataWithSplitsLastRun() {
   for (let prop in stockSplitsDictionary) {
-    const split = stockSplitsDictionary[prop];
-    if (split.length > 0) {
-      const symbol = symbolDictionary[prop];
-      
+    const splits = stockSplitsDictionary[prop];
+    const symbol = symbolDictionary[prop];
+    
+    for (let i = splits.length-1; i > -1; i--) {
+      const currentSplit = splits[i];
+  
+      // if split is after my last trade
+      if (moment(currentSplit.execution_date).isAfter(symbol.last_created_at)) {
+        //do math to symbol dictionary to adjust symbol data
+        symbol.quantity = symbol.quantity * (parseFloat(currentSplit.multiplier)/parseFloat(currentSplit.divisor));
+        symbol.average_price = symbol.total_price / symbol.quantity;
+        symbol.last_created_at = currentSplit.execution_date;
+        //remove split from array so we don't calculate it ever again
+        splits.splice(i, 1);
+      }
     }
   }
 }
@@ -68,7 +79,7 @@ function updateSymbolDataWithSplits(transaction) {
   const splits = stockSplitsDictionary[transaction.symbol];
   const symbol = symbolDictionary[transaction.symbol];
 
-  for (let i = splits.length; i > -1; i--) {
+  for (let i = splits.length-1; i > -1; i--) {
     const currentSplit = splits[i];
 
     // if split is between my last trade and my new trade
@@ -78,30 +89,10 @@ function updateSymbolDataWithSplits(transaction) {
       symbol.quantity = symbol.quantity * (parseFloat(currentSplit.multiplier)/parseFloat(currentSplit.divisor));
       symbol.average_price = symbol.total_price / symbol.quantity;
       symbol.last_created_at = currentSplit.execution_date;
-      //remove slit from array so we don't calculate it ever again
-      splits.pop();
-      //run again it is possible there are multiple splits between transactions
-      updateSymbolDataWithSplits(transaction);
+      //remove split from array so we don't calculate it ever again
+      splits.splice(i, 1);
     }
   }
-
-  // // if this symbol has splits
-  // if (splits.length > 0) {
-  //   const mostRecentSplit = splits[splits.length-1];
-  //   const symbol = symbolDictionary[transaction.symbol];
-
-  //   // if the most recent split in the array of splits is between my last trade and my new trade
-  //   if (moment(mostRecentSplit.execution_date).isAfter(symbol.last_created_at)
-  //     && moment(mostRecentSplit.execution_date).isBefore(transaction.created_at)) {
-  //       //do math to symbol dictionary to adjust symbol data
-  //       symbol.quantity = symbol.quantity * (parseFloat(mostRecentSplit.multiplier)/parseFloat(mostRecentSplit.divisor));
-  //       symbol.average_price = symbol.total_price / symbol.quantity;
-  //       symbol.last_created_at = mostRecentSplit.execution_date;
-  //       splits.pop();
-  //       //run again it is possible there are multiple splits between transactions
-  //       updateSymbolDataWithSplits(transaction);
-  //     } else return;
-  // } else return;
 }
 
 function addNewSymbol(transaction) {
