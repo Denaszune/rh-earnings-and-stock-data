@@ -39,9 +39,9 @@ function logStockTransactions(ticker) {
 }
 
 function logSymbolDictionary() {
+  console.log('');
   for (let prop in symbolDictionary) {
     const currentSymbol = symbolDictionary[prop];
-    console.log('');
     logSymbolSummary(prop, currentSymbol);
   }
 }
