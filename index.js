@@ -4,6 +4,7 @@ const request = require('request-promise-native');
 const inquirer = require('inquirer');
 const moment = require('moment');
 const chalk = require('chalk');
+const options = require('./options.json')
 
 let linkToSymbolDictionary = {};
 let stockSplitsDictionary = {};
@@ -13,8 +14,8 @@ const symbolArray = [];
 function logSymbolSummary(symbol, symbolObject) {
   console.log(chalk.magenta(symbol));
   console.log(chalk.gray('Shares: '+symbolObject.quantity));
-  console.log(chalk.gray('Total Cost: '+symbolObject.total_price));
-  console.log(chalk.gray('Average Cost (Adjusted Base Cost): '+symbolObject.average_price));
+  console.log(chalk.gray('Total Cost: '+symbolObject.total_cost));
+  console.log(chalk.gray('Average Cost (Adjusted Base Cost): '+symbolObject.average_cost));
   console.log('');
 }
 
@@ -55,11 +56,11 @@ function updateSymbolData(transaction) {
     const transaction_price = parseFloat(transaction.price);
     
     const new_quantity = symbol.quantity + transaction_quantity;
-    const new_total_price = symbol.total_price + (transaction_price*transaction_quantity);
+    const new_total_cost = symbol.total_cost + (transaction_price*transaction_quantity);
     
-    symbol.total_price = new_total_price;
+    symbol.total_cost = new_total_cost;
     symbol.quantity = new_quantity;
-    symbol.average_price = new_total_price / new_quantity;
+    symbol.average_cost = new_total_cost / new_quantity;
     symbol.last_created_at = transaction.created_at;
     symbol.transactions.push(transaction);
   }
@@ -73,11 +74,11 @@ function updateSymbolData(transaction) {
     const transaction_price = parseFloat(transaction.price);
 
     const new_quantity = symbol.quantity - transaction_quantity;
-    const new_total_price = symbol.total_price * (new_quantity/symbol.quantity);
+    const new_total_cost = symbol.total_cost * (new_quantity/symbol.quantity);
     
-    symbol.total_price = new_total_price;
+    symbol.total_cost = new_total_cost;
     symbol.quantity = new_quantity;
-    symbol.average_price = new_total_price / new_quantity;
+    symbol.average_cost = new_total_cost / new_quantity;
     symbol.last_created_at = transaction.created_at;
     symbol.transactions.push(transaction);
   }
@@ -95,7 +96,7 @@ function updateSymbolDataWithSplitsLastRun() {
       if (moment(currentSplit.execution_date).isAfter(symbol.last_created_at)) {
         //do math to symbol dictionary to adjust symbol data
         symbol.quantity = symbol.quantity * (parseFloat(currentSplit.multiplier)/parseFloat(currentSplit.divisor));
-        symbol.average_price = symbol.total_price / symbol.quantity;
+        symbol.average_cost = symbol.total_cost / symbol.quantity;
         symbol.last_created_at = currentSplit.execution_date;
         //remove split from array so we don't calculate it ever again
         splits.splice(i, 1);
@@ -116,7 +117,7 @@ function updateSymbolDataWithSplits(transaction) {
     && moment(currentSplit.execution_date).isBefore(transaction.created_at)) {
       //do math to symbol dictionary to adjust symbol data
       symbol.quantity = symbol.quantity * (parseFloat(currentSplit.multiplier)/parseFloat(currentSplit.divisor));
-      symbol.average_price = symbol.total_price / symbol.quantity;
+      symbol.average_cost = symbol.total_cost / symbol.quantity;
       symbol.last_created_at = currentSplit.execution_date;
       //remove split from array so we don't calculate it ever again
       splits.splice(i, 1);
@@ -126,10 +127,14 @@ function updateSymbolDataWithSplits(transaction) {
 
 function addNewSymbol(transaction) {
   if (transaction.side === 'buy') {
+
+    const price = parseFloat(transaction.price);
+    const quantity = parseFloat(transaction.quantity);
+
     symbolDictionary[transaction.symbol] = {
-      'average_price': parseFloat(transaction.price),
-      'total_price': parseFloat(transaction.price),
-      'quantity': parseFloat(transaction.quantity),
+      'average_cost': price * quantity,
+      'total_cost': price * quantity,
+      'quantity': quantity,
       'last_created_at': transaction.created_at,
       'transactions': [transaction]
     };
