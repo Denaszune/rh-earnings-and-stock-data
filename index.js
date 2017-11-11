@@ -4,7 +4,12 @@ const request = require('request-promise-native');
 const inquirer = require('inquirer');
 const moment = require('moment');
 const chalk = require('chalk');
-const options = require('./options.json')
+
+try {
+  const options = require('./options.json');
+} catch (ex) {
+  const options = {};
+}
 
 let linkToSymbolDictionary = {};
 let stockSplitsDictionary = {};
