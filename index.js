@@ -4,11 +4,12 @@ const request = require('request-promise-native');
 const inquirer = require('inquirer');
 const moment = require('moment');
 const chalk = require('chalk');
+let options;
 
 try {
-  const options = require('./options.json');
+  options = require('./options.json');
 } catch (ex) {
-  const options = {};
+  options = {};
 }
 
 let linkToSymbolDictionary = {};
@@ -35,7 +36,7 @@ function logStockTransactions(ticker) {
     console.log(chalk.magenta(currentTransaction.side.toUpperCase()));
     console.log(chalk.gray('Date: '+moment(currentTransaction.created_at).format('MMMM Do YYYY, h:mm:ss a')));
     console.log(chalk.gray('Shares: '+currentTransaction.quantity));
-    console.log(chalk.gray('Price: '+currentTransaction.price));
+    console.log(chalk.gray('Price: '+currentTransaction.average_price));
     console.log('');
   }
 
@@ -58,7 +59,7 @@ function updateSymbolData(transaction) {
     const symbol = symbolDictionary[transaction.symbol];
     
     const transaction_quantity = parseFloat(transaction.quantity);
-    const transaction_price = parseFloat(transaction.price);
+    const transaction_price = parseFloat(transaction.average_price);
     
     const new_quantity = symbol.quantity + transaction_quantity;
     const new_total_cost = symbol.total_cost + (transaction_price*transaction_quantity);
@@ -76,7 +77,7 @@ function updateSymbolData(transaction) {
     const symbol = symbolDictionary[transaction.symbol];
     
     const transaction_quantity = parseFloat(transaction.quantity);
-    const transaction_price = parseFloat(transaction.price);
+    const transaction_price = parseFloat(transaction.average_price);
 
     const new_quantity = symbol.quantity - transaction_quantity;
     const new_total_cost = symbol.total_cost * (new_quantity/symbol.quantity);
@@ -89,16 +90,52 @@ function updateSymbolData(transaction) {
   }
 }
 
+function skipSplitsForThisSymbol(symbol) {
+  if (options.ignoreSplits) {
+    for(let i = 0; i < options.ignoreSplits.length; i++) {
+      if(options.ignoreSplits[i] === symbol) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return false;
+}
+
 function updateSymbolDataWithSplitsLastRun() {
   for (let prop in stockSplitsDictionary) {
     const splits = stockSplitsDictionary[prop];
     const symbol = symbolDictionary[prop];
+
+    if(!skipSplitsForThisSymbol(prop)) {
+      for (let i = splits.length-1; i > -1; i--) {
+        const currentSplit = splits[i];
     
+        // if split is after my last trade
+        if (moment(currentSplit.execution_date).isAfter(symbol.last_created_at)) {
+          //do math to symbol dictionary to adjust symbol data
+          symbol.quantity = symbol.quantity * (parseFloat(currentSplit.multiplier)/parseFloat(currentSplit.divisor));
+          symbol.average_cost = symbol.total_cost / symbol.quantity;
+          symbol.last_created_at = currentSplit.execution_date;
+          //remove split from array so we don't calculate it ever again
+          splits.splice(i, 1);
+        }
+      }
+    }
+  }
+}
+
+function updateSymbolDataWithSplits(transaction) {
+  const splits = stockSplitsDictionary[transaction.symbol];
+  const symbol = symbolDictionary[transaction.symbol];
+
+  if(!skipSplitsForThisSymbol(transaction.symbol)) {
     for (let i = splits.length-1; i > -1; i--) {
       const currentSplit = splits[i];
-  
-      // if split is after my last trade
-      if (moment(currentSplit.execution_date).isAfter(symbol.last_created_at)) {
+
+      // if split is between my last trade and my new trade
+      if (moment(currentSplit.execution_date).isAfter(symbol.last_created_at)
+      && moment(currentSplit.execution_date).isBefore(transaction.created_at)) {
         //do math to symbol dictionary to adjust symbol data
         symbol.quantity = symbol.quantity * (parseFloat(currentSplit.multiplier)/parseFloat(currentSplit.divisor));
         symbol.average_cost = symbol.total_cost / symbol.quantity;
@@ -110,30 +147,10 @@ function updateSymbolDataWithSplitsLastRun() {
   }
 }
 
-function updateSymbolDataWithSplits(transaction) {
-  const splits = stockSplitsDictionary[transaction.symbol];
-  const symbol = symbolDictionary[transaction.symbol];
-
-  for (let i = splits.length-1; i > -1; i--) {
-    const currentSplit = splits[i];
-
-    // if split is between my last trade and my new trade
-    if (moment(currentSplit.execution_date).isAfter(symbol.last_created_at)
-    && moment(currentSplit.execution_date).isBefore(transaction.created_at)) {
-      //do math to symbol dictionary to adjust symbol data
-      symbol.quantity = symbol.quantity * (parseFloat(currentSplit.multiplier)/parseFloat(currentSplit.divisor));
-      symbol.average_cost = symbol.total_cost / symbol.quantity;
-      symbol.last_created_at = currentSplit.execution_date;
-      //remove split from array so we don't calculate it ever again
-      splits.splice(i, 1);
-    }
-  }
-}
-
 function addNewSymbol(transaction) {
   if (transaction.side === 'buy') {
 
-    const price = parseFloat(transaction.price);
+    const price = parseFloat(transaction.average_price);
     const quantity = parseFloat(transaction.quantity);
 
     symbolDictionary[transaction.symbol] = {
@@ -229,6 +246,7 @@ async function process(token) {
     trades = await getTrades(token, trades.next);
     orders = orders.concat(trades.results);
   }
+  
   await interateFilledTransactions(orders);
   updateSymbolDataWithSplitsLastRun();
 }
