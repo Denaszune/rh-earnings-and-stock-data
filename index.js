@@ -4,6 +4,8 @@ const request = require('request-promise-native');
 const inquirer = require('inquirer');
 const moment = require('moment');
 const chalk = require('chalk');
+const jsonexport = require('jsonexport');
+const fs = require('fs');
 let options;
 
 try {
@@ -12,6 +14,7 @@ try {
   options = {};
 }
 
+let orders = [];
 let linkToSymbolDictionary = {};
 let stockSplitsDictionary = {};
 let symbolDictionary = {};
@@ -30,6 +33,7 @@ function logStockTransactions(ticker) {
   console.log('');
   console.log(chalk.underline.bold('Transactions')+'\r');
   console.log('');
+  let shares = 0;
 
   for (let i = 0; i < symbol.transactions.length; i++) {
     const currentTransaction = symbol.transactions[i];
@@ -38,11 +42,18 @@ function logStockTransactions(ticker) {
     console.log(chalk.gray('Shares: '+currentTransaction.quantity));
     console.log(chalk.gray('Price: '+currentTransaction.average_price));
     console.log('');
+    if (currentTransaction.side.toUpperCase() === 'BUY') {
+      shares = shares + parseFloat(currentTransaction.quantity);
+    } else {
+      shares = shares - parseFloat(currentTransaction.quantity);
+    }
   }
 
   console.log(chalk.underline.bold('Summary'));
   console.log('');
   logSymbolSummary(ticker, symbol);
+  
+  console.log(shares);
 }
 
 function logSymbolDictionary() {
@@ -51,6 +62,17 @@ function logSymbolDictionary() {
     const currentSymbol = symbolDictionary[prop];
     logSymbolSummary(prop, currentSymbol);
   }
+}
+
+function exportToCSV() {
+  jsonexport(orders,function(err, csv){
+    if(err) return console.log(err);
+    // console.log(csv);
+    
+    const wstream = fs.createWriteStream('transactions.csv');
+    wstream.write(csv);
+    wstream.end();
+  });
 }
 
 function updateSymbolData(transaction) {
@@ -238,7 +260,6 @@ async function getTrades(token, uri) {
 
 async function process(token) {
   console.log(chalk.gray('Querying database and doing math...'));
-  let orders = [];
   let trades = await getTrades(token, 'https://api.robinhood.com/orders/');
   orders = orders.concat(trades.results);
 
@@ -267,6 +288,10 @@ const mainMenuQuestion = [{
     {
       name: 'Yearly Earnings',
       value: 'earnings'
+    },
+    {
+      name: 'Export Transactions to CSV',
+      value: 'export'
     }
   ]
 }];
@@ -291,6 +316,18 @@ function showMainMenu() {
       showMainMenu();
     }
     else if (answer.mainMenu === 'earnings') {
+      showMainMenu();
+    }
+    else if (answer.mainMenu === 'export') {
+      // exportToCSV();
+      for (let k = 0; k < orders.length; k++) {
+        const currentOrder = orders[k];
+        if (currentOrder.quantity === '4'){
+          console.log('HERE');
+        }
+      }
+      
+      
       showMainMenu();
     }
   });
