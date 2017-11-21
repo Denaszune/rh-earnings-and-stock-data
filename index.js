@@ -319,15 +319,7 @@ function showMainMenu() {
       showMainMenu();
     }
     else if (answer.mainMenu === 'export') {
-      // exportToCSV();
-      for (let k = 0; k < orders.length; k++) {
-        const currentOrder = orders[k];
-        if (currentOrder.quantity === '4'){
-          console.log('HERE');
-        }
-      }
-      
-      
+      exportToCSV();
       showMainMenu();
     }
   });
